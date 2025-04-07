@@ -1,4 +1,4 @@
-// #define LED_PIN 13
+#define LED_PIN 13
 #define SDA_PIN GPIO_NUM_21
 #define SCL_PIN GPIO_NUM_22
 
@@ -9,6 +9,7 @@
 #include "Wire.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include <ArduinoJson.h> 
 
 // Wifi parameter
 constexpr char WIFI_SSID[] = "KN";

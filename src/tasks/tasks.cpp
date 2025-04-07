@@ -1,4 +1,4 @@
-#include "../include/header.hpp"
+#include <header.hpp>
 #include "tasks/tasks.hpp"
 
 WiFiClient wifiClient;
@@ -21,6 +21,19 @@ void connectWifi (void *pvParameters) {
   vTaskDelete(NULL); 
 }
 
+RPC_Response setLedState(const RPC_Data &data) {
+  Serial.println("Received Switch state");
+  bool newState = data;
+  Serial.print("Switch state change: ");
+  Serial.println(newState);
+  digitalWrite(LED_PIN, newState);
+  return RPC_Response("setLedSwitchValue", newState);
+}
+
+const std::array<RPC_Callback, 1U> callbacks = {
+RPC_Callback{ "setLedSwitchValue", setLedState }
+};
+
 void connectThingsBoard (void *pvParameters){
   // connect to thingsboard
   Serial.print("\nConnecting to ");
@@ -33,6 +46,14 @@ void connectThingsBoard (void *pvParameters){
   }
   Serial.println("Connect to thingsboard successfully!");
   tb.sendAttributeData("macAddress", WiFi.macAddress().c_str());
+
+  Serial.println("Subscribing for RPC...");
+  if (!tb.RPC_Subscribe(callbacks.cbegin(), callbacks.cend())) {
+    Serial.println("Failed to subscribe for RPC");
+    return;
+  }
+  Serial.println("Subscribe done");
+
   vTaskDelete(NULL); 
 }
 
