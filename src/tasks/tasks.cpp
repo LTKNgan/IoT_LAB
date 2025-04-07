@@ -27,11 +27,11 @@ RPC_Response setLedState(const RPC_Data &data) {
   Serial.print("Switch state change: ");
   Serial.println(newState);
   digitalWrite(LED_PIN, newState);
-  return RPC_Response("setLedSwitchValue", newState);
+  return RPC_Response("setLedValue", newState);
 }
 
 const std::array<RPC_Callback, 1U> callbacks = {
-RPC_Callback{ "setLedSwitchValue", setLedState }
+RPC_Callback{ "setLedValue", setLedState }
 };
 
 void connectThingsBoard (void *pvParameters){
