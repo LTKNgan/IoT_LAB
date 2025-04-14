@@ -17,7 +17,7 @@ constexpr int16_t telemetrySendInterval = 10000U;
 
 WiFiClient wifiClient;
 Arduino_MQTT_Client mqttClient(wifiClient);
-ThingsBoard tb(mqttClient, MAX_MESSAGE_SIZE);
+ThingsBoard tb(mqttClient, MAX_MESSAGE_RECEIVE_SIZE, MAX_MESSAGE_SEND_SIZE, Default_Max_Stack_Size, apis);
 
 DHT20 dht20;
 
@@ -141,4 +141,166 @@ void subscribeRPC (void *pvParameters) {
     tb.sendAttributeData(LED_STATE_ATTR, digitalRead(LED_PIN));
   }
   vTaskDelete(NULL); 
+}
+
+
+
+
+Espressif_Updater<> updater;
+// Statuses for updating
+bool shared_update_subscribed = false;
+bool currentFWSent = false;
+bool updateRequestSent = false;
+bool requestedShared = false;
+
+
+OTA_Firmware_Update<> ota;
+Attribute_Request<2U, MAX_ATTRIBUTES> attr_request;
+const std::array<IAPI_Implementation*, 3U> apis = {
+    &shared_update,
+    &attr_request,
+    &ota
+};
+
+
+// struct binary_data_t {
+//     size_t size;
+//     size_t remaining_size;
+//     void * data;
+// };
+
+// /////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void processSharedAttributeRequest(const JsonObjectConst &data) {
+  //Info
+  const size_t jsonSize = Helper::Measure_Json(data);
+  char buffer[jsonSize];
+  serializeJson(data, buffer, jsonSize);
+  Serial.println(buffer);
+}
+
+void processSharedAttributeUpdate(const JsonObjectConst &data) {
+  //Info
+  const size_t jsonSize = Helper::Measure_Json(data);
+  char buffer[jsonSize];
+  serializeJson(data, buffer, jsonSize);
+  Serial.println(buffer);
+}
+
+// void otaSDToFlashTask(void* pvParameter) {
+//     FILE * ota_bin_file = fopen(UPDAT_FILE_PATH, "rb");
+//     esp_ota_handle_t update_handle;
+//     esp_partition_t const * update_partition = esp_ota_get_next_update_partition(NULL);
+//     binary_data_t data;
+
+//     if (ota_bin_file == nullptr) {
+//         ESP_LOGE("MAIN", "Failed to open file for Update");
+//         vTaskDelete(NULL);
+//     } else {
+//         esp_err_t error = ESP_OK;
+//         ESP_LOGI("MAIN", "Opened File for Update");
+//         fseek(ota_bin_file, 0, SEEK_END);
+//         data.size = ftell(ota_bin_file);
+//         data.remaining_size = data.size;
+//         ESP_LOGI("MAIN", "Update Size: %u", data.size);
+//         data.data = malloc(FIRMWARE_PACKET_SIZE);
+//         fseek(ota_bin_file, 0, SEEK_SET);
+//         esp_ota_begin(update_partition, OTA_SIZE_UNKNOWN, &update_handle);
+//         while (data.remaining_size > 0) {
+//             size_t const size = data.remaining_size <= FIRMWARE_PACKET_SIZE ? data.remaining_size : FIRMWARE_PACKET_SIZE;
+//             fread(data.data, size, 1, ota_bin_file);
+//             error = esp_ota_write(update_handle, data.data, size);
+//             if (data.remaining_size <= FIRMWARE_PACKET_SIZE) {
+//                 break;
+//             }
+//             data.remaining_size -= FIRMWARE_PACKET_SIZE;
+//             vTaskDelay(0);
+//         }
+//         if (error != ESP_OK) {
+//             ESP_LOGE("MAIN", "Failed to write OTA data: 0x%X (%s)", error, esp_err_to_name(error));
+//         }
+//         error = esp_ota_end(update_handle);
+//         if (error != ESP_OK) {
+//             ESP_LOGE("MAIN", "Failed to end OTA update: 0x%X (%s)", error, esp_err_to_name(error));
+//         }
+
+//         error = esp_ota_set_boot_partition(update_partition);
+//         if (error != ESP_OK) {
+//             ESP_LOGE("MAIN", "Failed to set boot partition: 0x%X (%s)", error, esp_err_to_name(error));
+//         } else {
+//             ESP_LOGI("MAIN", "Updated with data from SD card, Restarting");
+//             esp_restart();
+//         }
+//         vTaskDelete(NULL);
+//         return;
+//     }
+// }
+
+void update_starting_callback() {
+  // Nothing to do
+}
+
+void finished_callback(const bool & success) {
+  if (success) {
+    Serial.println("Downloading firmware successfull!");
+    xTaskCreate(otaSDToFlashTask, "OTA_SD_TO_FLASH", FIRMWARE_PACKET_SIZE + 1024 * 1, NULL, 16, NULL);
+    // esp_restart();
+    return;
+  }
+  Serial.println("Downloading firmware failed");
+}
+
+void progress_callback(const size_t & current, const size_t & total) {
+  Serial.println("Downwloading firmware progress %.2f%%", static_cast<float>(current * 100U) / total);
+}
+
+void OTAupdate (void* pvParameter) {
+  // if (!currentFWSent) {
+  //   currentFWSent = ota.Firmware_Send_Info(CURRENT_FIRMWARE_TITLE, CURRENT_FIRMWARE_VERSION);
+  // }
+  // if (!updateRequestSent) {
+  //   const OTA_Update_Callback callback(CURRENT_FIRMWARE_TITLE, CURRENT_FIRMWARE_VERSION, &updater, &finished_callback, &progress_callback, &update_starting_callback, FIRMWARE_FAILURE_RETRIES, FIRMWARE_PACKET_SIZE);
+  //   updateRequestSent = ota.Start_Firmware_Update(callback);
+  // }
+
+
+
+if (!requestedShared) {
+  Serial.println("Requesting shared attributes...");
+  const Attribute_Request_Callback<MAX_ATTRIBUTES> sharedCallback(&processSharedAttributeRequest, REQUEST_TIMEOUT_MICROSECONDS, &requestTimedOut, SHARED_ATTRIBUTES);
+  requestedShared = attr_request.Shared_Attributes_Request(sharedCallback);
+  if (!requestedShared) {
+    Serial.println("Failed to request shared attributes");
+  }
+}
+
+if (!shared_update_subscribed){
+  Serial.println("Subscribing for shared attribute updates...");
+  const Shared_Attribute_Callback<MAX_ATTRIBUTES> callback(&processSharedAttributeUpdate, SHARED_ATTRIBUTES);
+  if (!shared_update.Shared_Attributes_Subscribe(callback)) {
+  Serial.println("Failed to subscribe for shared attribute updates");
+  // continue;
+  }
+  Serial.println("Subscribe done");
+  shared_update_subscribed = true;
+}
+
+if (!currentFWSent) {
+currentFWSent = ota.Firmware_Send_Info(CURRENT_FIRMWARE_TITLE, CURRENT_FIRMWARE_VERSION);
+}
+
+if (!updateRequestSent) {
+  Serial.print(CURRENT_FIRMWARE_TITLE);
+  Serial.println(CURRENT_FIRMWARE_VERSION);
+  Serial.println("Firwmare Update ...");
+  const OTA_Update_Callback callback(CURRENT_FIRMWARE_TITLE, CURRENT_FIRMWARE_VERSION, &updater, &finished_callback, &progress_callback, &update_starting_callback, FIRMWARE_FAILURE_RETRIES, FIRMWARE_PACKET_SIZE);
+  updateRequestSent = ota.Start_Firmware_Update(callback);
+  if(updateRequestSent) {
+    delay(500);
+    Serial.println("Firwmare Update Subscription...");
+    updateRequestSent = ota.Subscribe_Firmware_Update(callback);
+  }
+}
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+
 }
