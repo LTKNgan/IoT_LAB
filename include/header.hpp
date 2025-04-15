@@ -1,4 +1,4 @@
-#define LED_PIN GPIO_NUM_12
+#define LED_PIN GPIO_NUM_2
 #define SDA_PIN GPIO_NUM_21
 #define SCL_PIN GPIO_NUM_22
 
@@ -24,12 +24,13 @@ constexpr char TOKEN[] = "AhbeGa4zPtrjwGYjomrq";
 constexpr char THINGSBOARD_SERVER[] = "app.coreiot.io";
 constexpr uint16_t THINGSBOARD_PORT = 1883U;
 constexpr uint32_t MAX_MESSAGE_SIZE = 1024U;
+constexpr int16_t telemetrySendInterval = 10000U;
 
 constexpr uint32_t SERIAL_DEBUG_BAUD = 115200U;
 
 // OTA update parameter
-constexpr char CURRENT_FIRMWARE_TITLE[] = "firmware";
-constexpr char CURRENT_FIRMWARE_VERSION[] = "1.0.0";
+constexpr char CURRENT_FIRMWARE_TITLE[] = "IoT_LAB3_Firmware";
+constexpr char CURRENT_FIRMWARE_VERSION[] = "1.1";
 // Maximum amount of retries we attempt to download each firmware chunck over MQTT
 constexpr uint8_t FIRMWARE_FAILURE_RETRIES = 12U;
 // Size of each firmware chunck downloaded over MQTT,
@@ -37,3 +38,5 @@ constexpr uint8_t FIRMWARE_FAILURE_RETRIES = 12U;
 constexpr uint16_t FIRMWARE_PACKET_SIZE = 4096U;
 constexpr uint16_t MAX_MESSAGE_SEND_SIZE = FIRMWARE_PACKET_SIZE + 50U;
 constexpr uint16_t MAX_MESSAGE_RECEIVE_SIZE = FIRMWARE_PACKET_SIZE + 50U;
+constexpr uint64_t REQUEST_TIMEOUT_MICROSECONDS = 10000U * 1000U;
+
